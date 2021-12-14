@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 <head>
   <title>Mortgage Simulator  </title>
 </head>
@@ -9,9 +10,9 @@
    <div id = "world">World 1</div>
 </p>-->
 </p><div id="intructions">
-  <div>---Mortgage Simulator---</div>
+  <div>---Instructions---</div>
   <div>Press Spacebar to advance a month (hold to go fast)</div>
-  <div>Press Tab to advance 12 months (hold to go fast)</div>
+  <div>Press N to advance until rates fall from where they are now</div>
   <div>Press S to skip to the end making all payments</div>
   <div>Press R to refinance</div>
   <div>Press P to pay off the loan</div>
@@ -40,6 +41,10 @@
   <div id="new_rate">Rate=4%</div>
   <div id="fees">Fees=$0</div>
 </div></p>
+<p>
+   <div>---Chart---</div>
+   <div id="myPlot" style="width:100%;max-width:700px"></div>
+</p>
 </p>
    <div>---Message---</div>
    <div id="message"></div>
@@ -61,7 +66,10 @@ var new_fees = 0;
 var change = 0.005;
 
 var rate_history = [];
+var my_rate_history = [];
 rate_history[0] = new_rate;
+my_rate_history[0] = new_rate;
+chart()
 var gameover = false;
 
 // Standard Normal variate using Box-Muller transform.
@@ -123,7 +131,7 @@ function update_rates()
    rate_history[rate_history.length] = new_rate;
    update("new_rate", "Rate=" + new_rate +"%");
 }
-function next_month()
+function next_month(drawchart=true)
 {
    if (gameover)
       return;
@@ -137,6 +145,8 @@ function next_month()
    var principal = ppmt(balance, rem_term, loan_rate);
    balance = balance - principal;
    rem_term = rem_term - 1;
+   my_rate_history[my_rate_history.length] = loan_rate;
+
 
    balance = +(balance.toFixed(2));
 
@@ -149,6 +159,11 @@ function next_month()
    update("balance", "Current Balance=$" + dollar(balance));
    update("rem_term", "Remaining Term=" + rem_term);
    update("message","")
+
+   if(drawchart)
+   {
+       chart()
+   }
 
    if (rem_term == 0)
    {
@@ -178,21 +193,29 @@ function refi()
     update("payment","Current Payment=$" + dollar(payment));
     update("cash","Current Cash=$" + dollar(cash));
     update("message","Refi Successful!")
+    chart()
 }
-function skip(months=rem_term)
+function skip(months=rem_term, break_rate=-1)
 {
 	var i;
 	var months_left = Math.min(months,rem_term);
     for (i=0;i<months_left;i++)
 	{
-		next_month();
+		next_month(drawchart=false);
+
+		if (new_rate < break_rate)
+		{
+			chart();
+			return;
+		}
 	}
-    update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-    update("balance", "Current Balance=$" + dollar(balance));
-    update("rem_term", "Remaining Term=" + rem_term);
-    update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=$" + dollar(payment));
-    update("cash","Current Cash=$" + dollar(cash));
+	chart();
+    //update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
+    //update("balance", "Current Balance=$" + dollar(balance));
+    //update("rem_term", "Remaining Term=" + rem_term);
+    //update("loan_rate","Current Rate=" + loan_rate + "%");
+    //update("payment","Current Payment=$" + dollar(payment));
+    //update("cash","Current Cash=$" + dollar(cash));
 }
 function payoff()
 {
@@ -284,6 +307,36 @@ function optimized_refi_path(message)
 	//txt = txt + "<div>Savings Score = " + round(savings_score) + "%</div>";
 
 	update("message",txt);
+	chart()
+}
+function chart()
+{
+	var xvals = Array.from(Array(rate_history.length).keys());
+	var rate_max=Math.max(rate_history)
+	// Define Data
+	var rates1 = {
+	  x: xvals,
+	  y: rate_history,
+	  mode:"lines",
+	  name:"market rate"
+	};
+	var rates2 = {
+	  x: xvals,
+	  y: my_rate_history,
+	  mode:"lines",
+	  name:"loan rate"
+	};
+	var data = [rates1,rates2]
+
+	// Define Layout
+	var layout = {
+	  xaxis: {range: [0, 360], title: "Month"},
+	  yaxis: {range: [0, 8], title: "Rate"},
+	  title: "Rate History"
+	};
+
+	// Display using Plotly
+	Plotly.newPlot("myPlot", data, layout);
 }
 
 document.body.onkeydown = function(e){
@@ -294,11 +347,11 @@ document.body.onkeydown = function(e){
     if (gameover)
     	return;
 
-    if(e.keyCode == 9){ //tab
-		skip(12);
-    }
     if(e.keyCode == 32){ //space
 		next_month();
+    }
+    if(e.keyCode == 78){ //N
+		skip(rem_term,break_rate=new_rate);
     }
     if(e.keyCode == 80){ //P
 		payoff();
@@ -308,6 +361,9 @@ document.body.onkeydown = function(e){
     }
     if(e.keyCode == 83){ //S
 		skip();
+    }
+    if(e.keyCode == 89){ //Y
+ 		skip(12);
     }
 
 }
