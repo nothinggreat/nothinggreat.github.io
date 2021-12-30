@@ -18,7 +18,8 @@
     <a href="javascript:next_month()">One Month &nbsp<span class='right'> (Space)</span></a>
     <a href="javascript:skip(12)">One Year &nbsp<span class='right'> (Y)</span></a>
     <a href="javascript:skip()">To Maturity &nbsp<span class='right'> (M)</span></a>
-    <a href="javascript:skip_until_rates_fall()">Until Rates Fall<span class='right'> (N)</span></a>
+    <a href="javascript:skip_until_rates_fall()">Until Rates Fall &nbsp<span class='right'> (N)</span></a>
+    <a href="javascript:skip_until_possible_payoff()">Until Possible Payoff &nbsp<span class='right'> (B)</span></a>
   </div>
   </div>
   <div class="dropdown">
@@ -31,6 +32,10 @@
     <a href="javascript:payoff()">Pay Off<span class='right'> (P)</span></a>
   </div>
   </div>
+</div>
+
+<a href="javascript:toggle('instructions')">---Instructions---</a>
+<div id="instructions">Pay off the loan with the minimum amount of money possible
 </div>
 <br>
 
@@ -59,15 +64,16 @@
   <div id="new_rate">Rate=4%</div>
   <div id="fees">Fees=$0</div>
 </div>
+<br>
 
 <!--
 <a href="javascript:toggle('home prices')">---Home Price---</a>
 <div id="hpi">
-  <div id="house_value">Current House Value=$400,000</div>
+  <div id="house_value">Current House Value=$500,000</div>
+  <div id="house_value">Current LTV=80</div>
 </div>
 <br>
 -->
-
 <a href="javascript:toggle('message')">---Message---</a>
 <div id="message"></div>
 </div>
@@ -213,9 +219,9 @@ function next_month(drawchart=true)
    update_rates()
 
    //display
-   update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-   update("cash", "Current Cash=$" + dollar(cash));
-   update("balance", "Current Balance=$" + dollar(balance));
+   update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+   update("cash", "Current Cash=" + dollar(cash));
+   update("balance", "Current Balance=" + dollar(balance));
    update("rem_term", "Remaining Term=" + rem_term);
    update("message","")
 
@@ -245,16 +251,16 @@ function refi()
 	payment = pmt(balance, rem_term, loan_rate)
     payment = +(payment.toFixed(2));
 
-    update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-    update("balance", "Current Balance=$" + dollar(balance));
+    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+    update("balance", "Current Balance=" + dollar(balance));
     update("rem_term", "Remaining Term=" + rem_term);
     update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=$" + dollar(payment));
-    update("cash","Current Cash=$" + dollar(cash));
+    update("payment","Current Payment=" + dollar(payment));
+    update("cash","Current Cash=" + dollar(cash));
     update("message","Refi Successful!")
     chart()
 }
-function skip(months=rem_term, break_rate=-1)
+function skip(months=rem_term, break_rate=-1, break_possible_payoff=false)
 {
 	var i;
 	var months_left = Math.min(months,rem_term);
@@ -267,14 +273,13 @@ function skip(months=rem_term, break_rate=-1)
 			chart();
 			return;
 		}
+		if (break_possible_payoff && (cash >= balance))
+		{
+			chart();
+			return;
+		}
 	}
 	chart();
-    //update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-    //update("balance", "Current Balance=$" + dollar(balance));
-    //update("rem_term", "Remaining Term=" + rem_term);
-    //update("loan_rate","Current Rate=" + loan_rate + "%");
-    //update("payment","Current Payment=$" + dollar(payment));
-    //update("cash","Current Cash=$" + dollar(cash));
 }
 function cashout()
 {
@@ -293,42 +298,42 @@ function cashout()
 	payment = pmt(balance, rem_term, loan_rate)
     payment = +(payment.toFixed(2));
 
-    update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-    update("balance", "Current Balance=$" + dollar(balance));
+    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+    update("balance", "Current Balance=" + dollar(balance));
     update("rem_term", "Remaining Term=" + rem_term);
     update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=$" + dollar(payment));
-    update("cash","Current Cash=$" + dollar(cash));
+    update("payment","Current Payment=" + dollar(payment));
+    update("cash","Current Cash=" + dollar(cash));
     update("message","Cashout Successful!")
     chart()
 }
 function payoff()
 {
-    if (cash < new_fees)
+    if (cash < balance)
     {
     	update("message","Not Enough Cash to Pay Off Loan")
     	return;
     }
 
 	cumulative_payments = cumulative_payments + balance;
-    balance = 0;
-    rem_term = 0;
-    loan_rate = 0;
-    payment = 0;
+    //balance = 0;
+    //rem_term = 0;
+    //loan_rate = 0;
+    //payment = 0;
 
-    update("cumulative_payments", "Cumulative Payments=$" + dollar(cumulative_payments));
-    update("balance", "Current Balance=$" + dollar(balance));
+    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+    update("balance", "Current Balance=" + dollar(balance));
     update("rem_term", "Remaining Term=" + rem_term);
     update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=$" + dollar(payment));
-    update("cash","Current Cash=$" + dollar(cash));
+    update("payment","Current Payment=" + dollar(payment));
+    update("cash","Current Cash=" + dollar(cash));
     optimized_refi_path("Payoff Successful!");
     gameover=true;
 }
 function dollar(val)
 {
 	val = +(val.toFixed(2));
-	return val.toLocaleString()
+	return val.toLocaleString('en-US', {style:'currency', currency:'USD'});
 }
 function round(val)
 {
@@ -343,7 +348,7 @@ function optimized_refi_path(message)
     var starting_term = 360;
     var starting_balance = 400000;
     var starting_rate = 4;
-	var payoff_age = 210;
+	var payoff_age = 142
 	var payoff_bal = sched_bal(starting_balance, starting_term, starting_rate, payoff_age);
 	var total_payments_naive = starting_payment * starting_term;
 
@@ -374,22 +379,16 @@ function optimized_refi_path(message)
 	}
 
 	txt = "<div>" + message + "</div>";
-	//txt = txt + "<div>min_rate = " + o_min_rate + "%</div>";
-	//txt = txt + "<div>min_age = " + o_min_age + "</div>";
-	//txt = txt + "<div>min_balance = " + dollar(o_min_balance) + "</div>";
-	//txt = txt + "<div>min_payment = " + dollar(o_min_payment) + "</div>";
-	txt = txt + "<p><div>---Stats---</div></p?";
+	txt = txt + "<div>Lowest Rate = " + min_rate + "%</div>";
 	txt = txt + "<div>Your Rate = " + loan_rate + "%</div>";
-	txt = txt + "<div>Best Rate = " + min_rate + "%</div>";
-	txt = txt + "<div>Worst Rate = " + max_rate + "%</div>";
 	txt = txt + "<div> </div>";
-	txt = txt + "<div>Your Total Payments = " + dollar(cumulative_payments) + "</div>";
-	//txt = txt + "<div>Refi at Min Rate Payments = " + dollar(total_payments_o_min_rate) + "</div>";
-	txt = txt + "<div>Minimum Possible Payments = " + dollar(lowest_payments) + "</div>";
-	txt = txt + "<div>Total Payments Doing Nothing = " + dollar(total_payments_naive) + "</div>";
+	txt = txt + "<div>Minimum Payments = " + dollar(lowest_payments) + "</div>";
+	txt = txt + "<div>Scheduled Payments = " + dollar(total_payments_naive) + "</div>";
+	txt = txt + "<div>Your Payments = " + dollar(cumulative_payments) + "</div>";
 	txt = txt + "<div> </div>";
-	txt = txt + "<div>You Saved = $" + dollar(savings) + " out of a possible $" + max_savings.toLocaleString() + "!  Good Job!</div>";
-	//txt = txt + "<div>Savings Score = " + round(savings_score) + "%</div>";
+	txt = txt + "<div>Possible Savings = " + dollar(max_savings) + "</div>";
+	txt = txt + "<div>Your Savings = " + dollar(savings) + "</div>";
+	txt = txt + "<div>Savings Score = " + round(savings_score) + "%</div>";
 
 	update("message",txt);
 	chart()
@@ -424,9 +423,14 @@ function chart()
 	Plotly.newPlot("myPlot", data, layout);
 }
 
+function skip_until_possible_payoff()
+{
+	skip(rem_term,break_rate=-1,break_possible_payoff=true);
+}
+
 function skip_until_rates_fall()
 {
-	skip(rem_term,break_rate=new_rate);
+	skip(rem_term,break_rate=loan_rate);
 }
 document.body.onkeydown = function(e){
     if(e.keyCode == 27){ //ESC
@@ -436,11 +440,17 @@ document.body.onkeydown = function(e){
     if (gameover)
     	return;
 
-    if(e.keyCode == 32){ //space
+    if(e.keyCode == 32){ //Space
 		next_month();
+    }
+    if(e.keyCode == 66){ //B
+		skip_until_possible_payoff();
     }
     if(e.keyCode == 67){ //C
 		cashout();
+    }
+    if(e.keyCode == 77){ //M
+		skip();
     }
     if(e.keyCode == 78){ //N
 		skip_until_rates_fall();
@@ -450,9 +460,6 @@ document.body.onkeydown = function(e){
     }
     if(e.keyCode == 82){ //R
 		refi();
-    }
-    if(e.keyCode == 83){ //S
-		skip();
     }
     if(e.keyCode == 89){ //Y
  		skip(12);
