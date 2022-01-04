@@ -61,31 +61,8 @@ a:active { color: gray; text-decoration: none; }
   background-color: #ddd;
 }
 
-.show {
-  display: block;
-}
-
 .container {
   display: flex;
-}
-
-.row {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  width: 100%;
-  background: lightgray;
-}
-
-.column {
-  display: flex;
-  flex-direction: column;
-  flex: 1 0 50%;
-}
-
-.right {
-float:right;
-color:lightgray;
 }
 
 .wrap {
@@ -99,4 +76,8 @@ color:lightgray;
 .rightcol {
    float:right;
    width:80%;
+}
+
+.center {
+   text-align: center;
 }

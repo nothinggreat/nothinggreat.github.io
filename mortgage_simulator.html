@@ -10,28 +10,50 @@
 <body>
 
 <div class="navbar">
+
   <div class="dropdown">
-  <button class="dropbtn" id='simulate_btn' onclick="toggle2('simulate_dropdown')">Simulate
-    <small><small>&#9660;</small></small>
-  </button>
-  <div class="dropdown-content" id="simulate_dropdown">
-    <a href="javascript:next_month()">One Month &nbsp<span class='right'> (Space)</span></a>
-    <a href="javascript:skip(12)">One Year &nbsp<span class='right'> (Y)</span></a>
-    <a href="javascript:skip()">To Maturity &nbsp<span class='right'> (M)</span></a>
-    <a href="javascript:skip_until_rates_fall()">Until Rates Fall &nbsp<span class='right'> (N)</span></a>
-    <a href="javascript:skip_until_possible_payoff()">Until Possible Payoff &nbsp<span class='right'> (B)</span></a>
-  </div>
+     <a href="javascript:start_simulation()"><img id = "go_img" src="go.png" alt="Go" class="center"></a>
   </div>
   <div class="dropdown">
-  <button class="dropbtn" id='refi_btn' onclick="toggle2('refi_dropdown')">Actions
-    <small><small>&#9660;</small></small>
-  </button>
-  <div class="dropdown-content" id="refi_dropdown">
-    <a href="javascript:refi()">Refinance<span class='right'> (R)</span></a>
-    <a href="javascript:cashout()">Cashout<span class='right'> (C)</span></a>
-    <a href="javascript:payoff()">Pay Off<span class='right'> (P)</span></a>
+     <a href="javascript:next_month()"><img id = "forward_img" src="forward.png" alt="Forward" class="center"></a>
   </div>
+  <div class="dropdown">
+     <a href=""><img id = "backward_img" src="backward.png" alt="Backward" class="center"></a>
   </div>
+  <!--
+  <div class="dropdown">
+    <button class="dropbtn" id='simulate_btn' onclick="toggle('simulate_dropdown')">Simulate
+      <small><small>&#9660;</small></small>
+    </button>
+    <div class="dropdown-content" id="simulate_dropdown">
+      <a href="javascript:next_month()">One Month &nbsp<span class='right'> (Space)</span></a>
+      <a href="javascript:skip()">To Maturity &nbsp<span class='right'> (M)</span></a>
+      <a href="javascript:skip_until_rates_fall()">Until Rates Fall &nbsp<span class='right'> (N)</span></a>
+      <a href="javascript:skip_until_possible_payoff()">Until Possible Payoff &nbsp<span class='right'> (B)</span></a>
+    </div>
+  </div>
+  -->
+  <div class="dropdown">
+    <button class="dropbtn" id='refi_btn' onclick="toggle('refi_dropdown')">Actions
+      <small><small>&#9660;</small></small>
+    </button>
+    <div class="dropdown-content" id="refi_dropdown">
+      <a href="javascript:refi()">Refinance<span class='right'> (R)</span></a>
+      <a href="javascript:cashout()">Cashout<span class='right'> (C)</span></a>
+      <a href="javascript:payoff()">Payoff<span class='right'> (P)</span></a>
+    </div>
+  </div>
+  <!--
+  <div class="dropdown">
+    <button class="dropbtn" id='settings_btn' onclick="toggle('settings_dropdown')">Settings
+      <small><small>&#9660;</small></small>
+    </button>
+    <div class="dropdown-content" id="settings_dropdown">
+      <a>Speed</a>
+      <a>Alerts</a>
+    </div>
+  </div>
+  -->
 </div>
 
 <a href="javascript:toggle('instructions')">---Instructions---</a>
@@ -43,34 +65,34 @@
 <div class='leftcol'>
 <a href="javascript:toggle('finances')">---Finances---</a>
 <div id="finances">
-  <div id = "cash">Current Cash=$0</div>
-  <div id = "income">Current Income=$3,000</div>
-  <div id = "cumulative_payments">Cumulative Payments=$0</div>
+  <div id = "cash"></div>
+  <div id = "income"></div>
+  <div id = "cumulative_payments"></div>
 </div>
 <br>
 
 <a href="javascript:toggle('loan')">---Loan---</a>
 <div id="loan">
-  <div id = "balance">Current Balance=$400,000.00</div>
-  <div id = "rem_term">Remaining Term=360</div>
-  <div id = "loan_rate">Current Rate=4%</div>
-  <div id = "payment">Current Payment=$1,909.66</div>
+  <div id = "balance"></div>
+  <div id = "rem_term"></div>
+  <div id = "loan_rate"></div>
+  <div id = "payment"></div>
 </div>
 <br>
 
 <a href="javascript:toggle('rates')">---Rates---</a>
 <div id="rates">
-  <div id="term">Term=360</div>
-  <div id="new_rate">Rate=4%</div>
-  <div id="fees">Fees=$0</div>
+  <div id="new_term"></div>
+  <div id="new_rate"></div>
+  <div id="new_fees"></div>
 </div>
 <br>
 
 <!--
 <a href="javascript:toggle('home prices')">---Home Price---</a>
 <div id="hpi">
-  <div id="house_value">Current House Value=$500,000</div>
-  <div id="house_value">Current LTV=80</div>
+  <div id="house_value"></div>
+  <div id="house_value"></div>
 </div>
 <br>
 -->
@@ -89,9 +111,10 @@
 
 </div><!-- End Wrap-->
 <script>
-var cumulative_payments = 0;
+//global variables
 var cash = 0;
 var income = 4000;
+var cumulative_payments = 0;
 
 var orig_balance = 400000;
 var balance = 400000;
@@ -107,9 +130,11 @@ var change = 0.005;
 var rate_history = [];
 var my_rate_history = [];
 rate_history[0] = new_rate;
-my_rate_history[0] = new_rate;
-chart()
+my_rate_history[0] = loan_rate;
+
+update_all();
 var gameover = false;
+var go = false;
 
 function update(elem_name, text)
 {
@@ -118,29 +143,16 @@ function update(elem_name, text)
 function toggle(elem_name)
 {
 	elem = document.getElementById(elem_name);
-	style = window.getComputedStyle(elem)
+	elem.style.display = (elem.style.display === 'block') ? 'none' : 'block';
+}
 
-	if (style.display === "none")
-	{
-		elem.style.display = "block";
-	}
-	else
-	{
-		elem.style.display = "none";
-	}
-}
-function toggle2(elem_name)
-{
-	document.getElementById(elem_name).classList.toggle("show");
-}
-function show(elem_name)
-{
-	document.getElementById(elem_name).classList.add("show");
-}
 function hide(elem_name)
 {
-	document.getElementById(elem_name).classList.remove("show");
+	elem = document.getElementById(elem_name);
+	style = window.getComputedStyle(elem)
+	elem.style.display = "none";
 }
+
 // Standard Normal variate using Box-Muller transform.
 function randn(mean,stdev) {
     var u = 0, v = 0;
@@ -194,8 +206,29 @@ function update_rates()
    new_rate = new_rate + change
    new_rate = +(new_rate.toFixed(2));
    rate_history[rate_history.length] = new_rate;
-   update("new_rate", "Rate=" + new_rate +"%");
 }
+function update_all(drawchart=true)
+{
+   update("cash", "Current Cash=" + dollar(cash));
+   update("income", "Current Income=" + dollar(income));
+   update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+
+   update("balance", "Current Balance=" + dollar(balance));
+   update("rem_term", "Remaining Term=" + rem_term);
+   update("loan_rate","Current Rate=" + loan_rate + "%");
+   update("payment","Current Payment=" + dollar(payment));
+
+   update("new_term", "Term=" + new_term);
+   update("new_rate", "Rate=" + new_rate +"%");
+   update("new_fees", "Fees=" + dollar(new_fees));
+
+   update("message","");
+
+   if (drawchart == true) {
+   		chart();
+   }
+}
+
 function next_month(drawchart=true)
 {
    if (gameover)
@@ -219,16 +252,7 @@ function next_month(drawchart=true)
    update_rates()
 
    //display
-   update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
-   update("cash", "Current Cash=" + dollar(cash));
-   update("balance", "Current Balance=" + dollar(balance));
-   update("rem_term", "Remaining Term=" + rem_term);
-   update("message","")
-
-   if(drawchart)
-   {
-       chart()
-   }
+   update_all(drawchart)
 
    if (rem_term == 0)
    {
@@ -251,35 +275,36 @@ function refi()
 	payment = pmt(balance, rem_term, loan_rate)
     payment = +(payment.toFixed(2));
 
-    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
-    update("balance", "Current Balance=" + dollar(balance));
-    update("rem_term", "Remaining Term=" + rem_term);
-    update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=" + dollar(payment));
-    update("cash","Current Cash=" + dollar(cash));
+    update_all();
     update("message","Refi Successful!")
-    chart()
 }
-function skip(months=rem_term, break_rate=-1, break_possible_payoff=false)
+function sleep(duration)
+{
+	return new Promise(resolve => {
+		setTimeout(() => {
+			resolve()
+		}, duration)
+	})
+}
+async function skip(months=rem_term, break_rate=-1, break_possible_payoff=false)
 {
 	var i;
 	var months_left = Math.min(months,rem_term);
     for (i=0;i<months_left;i++)
 	{
-		next_month(drawchart=false);
+		if (go == false)
+			return;
+
+		next_month();
+
+		await sleep(1);
 
 		if (new_rate < break_rate)
-		{
-			chart();
 			return;
-		}
+
 		if (break_possible_payoff && (cash >= balance))
-		{
-			chart();
 			return;
-		}
 	}
-	chart();
 }
 function cashout()
 {
@@ -298,14 +323,8 @@ function cashout()
 	payment = pmt(balance, rem_term, loan_rate)
     payment = +(payment.toFixed(2));
 
-    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
-    update("balance", "Current Balance=" + dollar(balance));
-    update("rem_term", "Remaining Term=" + rem_term);
-    update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=" + dollar(payment));
-    update("cash","Current Cash=" + dollar(cash));
+    update_all();
     update("message","Cashout Successful!")
-    chart()
 }
 function payoff()
 {
@@ -314,19 +333,14 @@ function payoff()
     	update("message","Not Enough Cash to Pay Off Loan")
     	return;
     }
-
+    cash = cash - balance;
 	cumulative_payments = cumulative_payments + balance;
     //balance = 0;
     //rem_term = 0;
     //loan_rate = 0;
     //payment = 0;
 
-    update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
-    update("balance", "Current Balance=" + dollar(balance));
-    update("rem_term", "Remaining Term=" + rem_term);
-    update("loan_rate","Current Rate=" + loan_rate + "%");
-    update("payment","Current Payment=" + dollar(payment));
-    update("cash","Current Cash=" + dollar(cash));
+	update_all();
     optimized_refi_path("Payoff Successful!");
     gameover=true;
 }
@@ -348,7 +362,8 @@ function optimized_refi_path(message)
     var starting_term = 360;
     var starting_balance = 400000;
     var starting_rate = 4;
-	var payoff_age = 142
+	var payoff_age = 142;
+
 	var payoff_bal = sched_bal(starting_balance, starting_term, starting_rate, payoff_age);
 	var total_payments_naive = starting_payment * starting_term;
 
@@ -358,7 +373,7 @@ function optimized_refi_path(message)
     var min_balance = sched_bal(starting_balance, starting_term, starting_rate, min_age);
 	var min_payment = pmt(min_balance, starting_term, min_rate);
 
-    var o_min_rate = Math.min.apply(Math,rate_history.slice(0,210));
+    var o_min_rate = Math.min.apply(Math,rate_history.slice(0,payoff_age));
     var o_min_age = rate_history.indexOf(o_min_rate);
     var o_min_balance = sched_bal(starting_balance, starting_term, starting_rate, o_min_age);
 	var o_min_payment = pmt(o_min_balance, starting_term, o_min_rate);
@@ -422,7 +437,20 @@ function chart()
 	// Display using Plotly
 	Plotly.newPlot("myPlot", data, layout);
 }
-
+function start_simulation()
+{
+	if (go==false)
+	{
+		go=true;
+		document.getElementById("go_img").src="stop.png";
+		skip();
+	}
+	else
+	{
+		go=false;
+		document.getElementById("go_img").src="go.png";
+	}
+}
 function skip_until_possible_payoff()
 {
 	skip(rem_term,break_rate=-1,break_possible_payoff=true);
@@ -440,19 +468,28 @@ document.body.onkeydown = function(e){
     if (gameover)
     	return;
 
+    if(e.keyCode == 13){ //Enter
+		go=false;
+    }
     if(e.keyCode == 32){ //Space
+		start_simulation();
+    }
+    if(e.keyCode == 190){ //Period
 		next_month();
     }
     if(e.keyCode == 66){ //B
+		go=true;
 		skip_until_possible_payoff();
     }
     if(e.keyCode == 67){ //C
 		cashout();
     }
     if(e.keyCode == 77){ //M
+    	go=true;
 		skip();
     }
     if(e.keyCode == 78){ //N
+		go=true;
 		skip_until_rates_fall();
     }
     if(e.keyCode == 80){ //P
@@ -464,7 +501,6 @@ document.body.onkeydown = function(e){
     if(e.keyCode == 89){ //Y
  		skip(12);
     }
-
 }
 
 // Close the dropdown if the user clicks outside of it
