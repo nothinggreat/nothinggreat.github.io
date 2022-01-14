@@ -18,6 +18,16 @@ a:active { color: gray; text-decoration: none; }
   text-decoration: none;
 }
 
+.splashscreen {
+    position:absolute;
+    top:100px;
+    left:100px;
+    width:50%;
+    height:50%;
+    background-color:pink;
+    border:2px solid blue;
+    z-index: 1;
+}
 .dropdown {
   float: left;
   overflow: hidden;
@@ -61,8 +71,31 @@ a:active { color: gray; text-decoration: none; }
   background-color: #ddd;
 }
 
+.show {
+  display: block;
+}
+
 .container {
   display: flex;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  width: 100%;
+  background: lightgray;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 50%;
+}
+
+.right {
+float:right;
+color:lightgray;
 }
 
 .wrap {
