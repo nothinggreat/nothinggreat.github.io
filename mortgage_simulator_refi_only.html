@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html>
+<!--<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>-->
+<script src="plotly-latest.min.js"></script>
+<script src="mortgage_simulator.js"></script>
+<head>
+  <title>Mortgage Simulator</title>
+  <link rel="stylesheet" href="mortgage_simulator.css">
+</head>
+<body>
+
+<div class="navbar">
+
+  <div class="dropdown">
+     <a href="javascript:start_simulation()"><img id = "go_img" src="go.png" alt="Go" class="center"></a>
+  </div>
+  <div class="dropdown">
+     <a href="javascript:next_month()"><img id = "forward_img" src="forward.png" alt="Forward" class="center"></a>
+  </div>
+  <div class="dropdown">
+    <button class="dropbtn" id='refi_btn' onclick="toggle('refi_dropdown')">Actions
+      <small><small>&#9660;</small></small>
+    </button>
+    <div class="dropdown-content" id="refi_dropdown">
+      <a href="javascript:refi()">Refinance<span class='right'> (R)</span></a>
+      <a href="javascript:payoff()">Payoff<span class='right'> (P)</span></a>
+    </div>
+  </div>
+</div>
+
+<a href="javascript:toggle('instructions')">---Instructions---</a>
+<div id="instructions">Pay off the loan with the minimum amount of money possible
+</div>
+<br>
+
+<div class='wrap'>
+<div class='leftcol'>
+<a href="javascript:toggle('finances')">---Finances---</a>
+<div id="finances">
+  <div id = "cash"></div>
+  <div id = "income"></div>
+  <div id = "cumulative_payments"></div>
+</div>
+<br>
+
+<a href="javascript:toggle('loan')">---Loan---</a>
+<div id="loan">
+  <div id = "balance"></div>
+  <div id = "rem_term"></div>
+  <div id = "loan_rate"></div>
+  <div id = "payment"></div>
+</div>
+<br>
+
+<a href="javascript:toggle('rates')">---Rates---</a>
+<div id="rates">
+  <div id="new_term"></div>
+  <div id="new_rate"></div>
+  <div id="new_fees"></div>
+</div>
+<br>
+
+<a href="javascript:toggle('message')">---Message---</a>
+<div id="message"></div>
+</div>
+
+</div><!-- End Left Column -->
+
+<div class='rightcol'>
+<a href="javascript:toggle('chart')">---Charts---</a>
+<div id="chart">
+  <div id="myPlot" style="width:100%;max-width:700px"></div>
+  <div id="myPlot2" style="width:100%;max-width:700px"></div>
+</div><!-- End Right Column -->
+
+
+</div><!-- End Wrap-->
+<script>
+//global variables
+var cash = 0;
+var income = 4000;
+var cumulative_payments = 0;
+
+//orig values
+var orig_balance = 400000;
+var orig_term = 360;
+var orig_rate = 5.5;
+var orig_payment = pmt(orig_balance, orig_term, orig_rate);
+
+//current values
+var balance = 400000;
+var rem_term = 360;
+var loan_rate = 5.5;
+var payment = 2271.16;
+
+//potential refi options
+var new_term = 360;
+var new_rate = loan_rate;
+var new_fees = 4000;
+var change = 0.005;
+
+var rate_history = [];
+var my_rate_history = [];
+rate_history[0] = loan_rate;
+my_rate_history[0] = loan_rate;
+var min_rate = loan_rate;
+var threshold = 1.0;
+var record_rate = loan_rate - threshold;
+
+var use_exact_optimal_calculations = 1;
+var optimal_payments = 671130.87;
+var optimal_refi_age = 0;
+var optimal_rate = 5.5;
+var optimal_rate_history = [];
+var optimal_rate_history2 = [];
+optimal_rate_history[0] = loan_rate;
+
+update_all();
+var counter=0;
+var gameover = false;
+var go = false;
+var break_payoff=true;
+
+function update(elem_name, text)
+{
+	document.getElementById(elem_name).innerHTML = text;
+}
+function toggle(elem_name)
+{
+	elem = document.getElementById(elem_name);
+	elem.style.display = (elem.style.display === 'block') ? 'none' : 'block';
+}
+
+function hide(elem_name)
+{
+	elem = document.getElementById(elem_name);
+	//style = window.getComputedStyle(elem)
+	elem.style.display = "none";
+}
+
+// Standard Normal variate using Box-Muller transform.
+function randn(mean,stdev) {
+    var u = 0, v = 0;
+    while(u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+    while(v === 0) v = Math.random();
+    return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v ) * stdev + mean;
+}
+function pmt(balance, term, rate)
+{
+	var r = rate / 1200;
+	var payment = (balance * r) / (1 - (Math.pow( (1 + r) , term * -1)));
+	return payment;
+}
+function sched_bal(balance, term, rate, age)
+{
+	var r = rate / 1200;
+	var sched_bal = balance * (Math.pow(1+r,term) - Math.pow(1+r,age)) / (Math.pow(1+r,term) - 1);
+	return sched_bal;
+}
+function ipmt(balance, term, rate)
+{
+	var interest = balance * rate / 1200;
+	return interest;
+}
+function ppmt(balance, term, rate)
+{
+	var payment = pmt(balance, term, rate);
+	var interest = ipmt(balance, term, rate);
+	var principal = payment - interest;
+	return principal;
+}
+function rem_term(balance, pmt, rate)
+{
+	var r = rate / 1200;
+	var rem = (Math.log(pmt/balance)- Math.log((pmt/balance)-r)) / Math.log(1+r);
+	return rem;
+}
+function update_payment()
+{
+   payment = pmt(balance, rem_term, loan_rate);
+   payment = +(payment.toFixed(2));
+
+   update("payment","Current Payment=$" + payment);
+}
+
+function update_rates()
+{
+   bigjump = Math.random() < 0.1;
+   if (bigjump)
+   {
+       change = randn(0,0.25)
+   }
+   else
+   {
+       change = randn(change/10,0.05)
+   }
+   new_rate = new_rate + change
+   new_rate = +(new_rate.toFixed(2));
+   rate_history[rate_history.length] = new_rate;
+   if (new_rate < min_rate) {
+       min_rate = new_rate;
+   }
+   if (new_rate < record_rate) {
+       record_rate = new_rate - threshold;
+   }
+
+   new_payments = calc_optimal_payments(counter,new_rate)
+   if (new_payments < optimal_payments)
+   {
+   		optimal_payments = new_payments;
+   		optimal_refi_age = counter;
+   		optimal_rate = new_rate;
+   }
+}
+
+function update_all(drawchart=true)
+{
+   update("cash", "Current Cash=" + dollar(cash));
+   update("income", "Current Income=" + dollar(income));
+   update("cumulative_payments", "Cumulative Payments=" + dollar(cumulative_payments));
+
+   update("balance", "Current Balance=" + dollar(balance));
+   update("rem_term", "Remaining Term=" + rem_term);
+   update("loan_rate","Current Rate=" + loan_rate + "%");
+   update("payment","Current Payment=" + dollar(payment));
+
+   update("new_term", "Term=" + new_term);
+   update("new_rate", "Rate=" + new_rate +"%");
+   update("new_fees", "Fees=" + dollar(new_fees));
+
+   update("message","");
+
+   if (drawchart == true) {
+   		chart();
+   }
+}
+
+function next_month(drawchart=true)
+{
+   if (gameover)
+      return;
+
+   //rates
+   update_rates();
+
+   //finances
+   cumulative_payments = cumulative_payments + payment;
+   cash = cash + income - payment;
+   cash = +(cash.toFixed(2));
+
+   //loan
+   var principal = ppmt(balance, rem_term, loan_rate);
+   balance = balance - principal;
+   rem_term = rem_term - 1;
+   my_rate_history[my_rate_history.length] = loan_rate;
+
+   balance = +(balance.toFixed(2));
+
+   //display
+   update_all(drawchart);
+
+   if (rem_term == 0)
+   {
+   	  optimized_refi_path("Loan is paid off!");
+      gameover=true;
+   }
+   counter = counter + 1;
+}
+function refi()
+{
+    if (cash < new_fees)
+    {
+    	update("message","Not Enough Cash to Refi")
+    	return;
+    }
+
+	loan_rate = new_rate;
+	rem_term = new_term;
+	cash = cash - new_fees;
+	cumulative_payments = cumulative_payments + new_fees;
+	payment = pmt(balance, rem_term, loan_rate)
+    payment = +(payment.toFixed(2));
+
+    update_all();
+    update("message","Refi Successful!")
+}
+function sleep(duration)
+{
+	return new Promise(resolve => {
+		setTimeout(() => {
+			resolve()
+		}, duration)
+	})
+}
+async function skip(months=rem_term, break_rate=record_rate, break_possible_payoff=break_payoff)
+{
+	var i;
+	var months_left = Math.min(months,rem_term);
+    for (i=0;i<months_left;i++)
+	{
+		if (go == false)
+			return;
+
+		next_month();
+
+		await sleep(1);
+
+		if (new_rate < break_rate)
+		{
+			update("message","Rates are at record lows!")
+			go=false;
+			document.getElementById("go_img").src="go.png";
+			return;
+		}
+
+		if (break_possible_payoff && (cash >= balance))
+		{
+			update("message","Payoff Option Available");
+			break_payoff=false;
+			go=false;
+			document.getElementById("go_img").src="go.png";
+			return;
+		}
+	}
+}
+
+function payoff()
+{
+    if (cash < balance)
+    {
+    	update("message","Not Enough Cash to Pay Off Loan")
+    	return;
+    }
+    cash = cash - balance;
+	cumulative_payments = cumulative_payments + balance;
+
+	update_all();
+    optimized_refi_path("Payoff Successful!");
+    gameover=true;
+}
+function dollar(val)
+{
+	val = +(val.toFixed(2));
+	return val.toLocaleString('en-US', {style:'currency', currency:'USD'});
+}
+function round(val)
+{
+	val = +(val.toFixed(2));
+	return val;
+}
+function calc_optimal_payments(refi_age, refi_rate)
+{
+	var current_payments = orig_payment * refi_age;
+	var new_payments = 0;
+    var refi_balance = balance;
+	var refi_payment = pmt(refi_balance, orig_term, refi_rate);
+
+	//re-simulate optimal strategy
+	var sim_cash = cash - new_fees;
+	var optimal_payments = 0;
+	var curr_bal = refi_balance;
+
+	for (i=0;i<orig_term;i++) // simulate new loan to maturity
+	{
+		sim_cash += income - refi_payment;
+		new_payments += refi_payment;
+		curr_bal = sched_bal(refi_balance, orig_term, refi_rate, i);
+		if (sim_cash > curr_bal)
+		{
+			break;
+		}
+	}
+
+	payoff_age = i;
+	total_payments = current_payments + new_payments + curr_bal;
+	return total_payments;
+}
+
+//polynomial approximation
+//could potentially make game run faster
+function calc_optimal_payments_est(refi_age,refi_rate)
+{
+	total_payments = 	400880.98983736 +
+		  				1.81627505e+03 * refi_age +
+		  				4.51936549e+04 * refi_rate +
+		  				-9.37340995e-01 * refi_age ** 2 +
+		  				-1.02944364e+02 * refi_age * refi_rate +
+		  				3.10557240e+03 * refi_rate ** 2 +
+		  				-1.85665687e-03 * refi_age ** 3 +
+		  				-4.56730212e-01 * refi_age ** 2 * refi_rate +
+		  				-1.26940611e+01 * refi_age * refi_rate ** 2 +
+		  				-4.61646996e+00 * refi_rate ** 3;
+    return total_payments;
+}
+
+ //calc optimal point as you go
+function optimized_refi_path(message)
+{
+
+    var total_payments_naive = orig_payment * orig_term;
+	var lowest_payments = Math.min(total_payments_naive,optimal_payments);
+	var savings = total_payments_naive - cumulative_payments;
+	var max_savings = total_payments_naive - lowest_payments;
+
+	var savings_score = 0;
+	if (max_savings != 0)
+	{
+		savings_score = 100 * savings / max_savings;
+	}
+
+	txt = "<div>" + message + "</div>";
+	txt = txt + "<div>Lowest Rate = " + min_rate + "%</div>";
+	txt = txt + "<div>Your Rate = " + loan_rate + "%</div>";
+	txt = txt + "<div> </div>";
+	txt = txt + "<div>Minimum Payments = " + dollar(lowest_payments) + "</div>";
+	txt = txt + "<div>Scheduled Payments = " + dollar(total_payments_naive) + "</div>";
+	txt = txt + "<div>Your Payments = " + dollar(cumulative_payments) + "</div>";
+	txt = txt + "<div> </div>";
+	txt = txt + "<div>Possible Savings = " + dollar(max_savings) + "</div>";
+	txt = txt + "<div>Your Savings = " + dollar(savings) + "</div>";
+	txt = txt + "<div>Savings Score = " + round(savings_score) + "%</div>";
+
+	for (i=0;i<rate_history.length;i++)
+	{
+		if (i < optimal_refi_age) {
+			optimal_rate_history[i] = orig_rate;
+		}
+		else {
+			optimal_rate_history[i] = optimal_rate;
+		}
+	}
+
+	update("message",txt);
+	chart(draw_optimal=1)
+}
+function chart(draw_optimal=0)
+{
+	var xvals = Array.from(Array(rate_history.length).keys());
+	var x2vals = Array.from(Array(optimal_rate_history.length).keys());
+
+	var xlen = xvals.length;
+	var rate_max=Math.max(rate_history)
+	// Define Data
+	var rates1 = {
+	  x: xvals,
+	  y: rate_history,
+	  mode:"lines",
+	  name:"market rate"
+	};
+	var rates2 = {
+	  x: xvals,
+	  y: my_rate_history,
+	  mode:"lines",
+	  name:"loan rate"
+	};
+	var rates3 = {
+	  x: x2vals,
+	  y: optimal_rate_history,
+	  mode:"lines",
+	  name:"optimal rate",
+	  line: {
+	  	dash: 'dot',
+	    width: 2
+  	  }
+	};
+
+	var data = [];
+	if (draw_optimal) {
+		data = [rates1,rates2,rates3];
+	}
+	else {
+		data = [rates1,rates2];
+	}
+
+	// Define Layout
+	var layout = {
+	  xaxis: {range: [0, 360], title: "Month"},
+	  yaxis: {range: [0, 8], title: "Rate"},
+	  //title: "Rate History"
+	};
+
+	// Display using Plotly
+	var myPlot = document.getElementById('myPlot')
+
+	Plotly.newPlot(myPlot, data, layout);
+
+	var dataRetrievedLater = myPlot.data;
+	var layoutRetrievedLater = myPlot.layout;
+}
+
+function start_simulation()
+{
+	if (go==false)
+	{
+		go=true;
+		document.getElementById("go_img").src="stop.png";
+		skip();
+	}
+	else
+	{
+		go=false;
+		document.getElementById("go_img").src="go.png";
+	}
+}
+function skip_until_possible_payoff()
+{
+	skip(rem_term,break_rate=-1,break_possible_payoff=true);
+}
+
+function skip_until_rates_fall()
+{
+	skip(rem_term,break_rate=loan_rate);
+}
+document.body.onkeydown = function(e){
+    if(e.keyCode == 27){ //ESC
+		window.location.reload();
+		return false;
+    }
+    if (gameover)
+    	return;
+
+    if(e.keyCode == 13){ //Enter
+		go=false;
+    }
+    if(e.keyCode == 32){ //Space
+		start_simulation();
+    }
+    if(e.keyCode == 190){ //Period
+		next_month();
+    }
+    if(e.keyCode == 66){ //B
+		go=true;
+		skip_until_possible_payoff();
+    }
+    if(e.keyCode == 77){ //M
+    	go=true;
+		skip();
+    }
+    if(e.keyCode == 78){ //N
+		go=true;
+		skip_until_rates_fall();
+    }
+    if(e.keyCode == 80){ //P
+		payoff();
+    }
+    if(e.keyCode == 82){ //R
+		refi();
+    }
+    if(e.keyCode == 89){ //Y
+ 		skip(12);
+    }
+}
+
+// Close the dropdown if the user clicks outside of it
+window.onclick = function(e) {
+
+  simulate_btn = document.getElementById('simulate_btn')
+  refi_btn = document.getElementById('refi_btn')
+
+  if (e.target != simulate_btn) {
+  	//hide('simulate_dropdown')
+  }
+  if (e.target != refi_btn) {
+  	hide('refi_dropdown')
+  }
+
+}
+</script>
+</body>
+</html>
